@@ -2,6 +2,11 @@ from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 import datetime
 import httpx
+import os
+from urllib import parse
+import asyncio
+from bs4 import BeautifulSoup
+import markdownify
 
 mcp = FastMCP("crawler")
 
@@ -107,6 +112,86 @@ async def _address_api(keyword,
     except Exception as e:
         return f"예상치 못한 오류 발생: {e}"
 
+def _filtering(
+    house_type: list,
+    jiyeok: str,
+    data_list: list
+) -> list:
+    new_data_list = []
+    for data in data_list:
+        # 집 필터 / 지역 필터
+        if house_type and jiyeok:
+            if data['SUBSCRPT_AREA_CODE_NM'] in jiyeok and data['HOUSE_SECD'] in house_type:
+                new_data_list.append(data)
+        # 집은 필터 / 지역은 전체
+        elif house_type and not jiyeok:
+            if data['HOUSE_SECD'] in house_type:
+                new_data_list.append(data)
+        # 집은 전체 / 지역은 필터
+        elif not house_type and jiyeok:
+            if data['SUBSCRPT_AREA_CODE_NM'] in jiyeok:
+                new_data_list.append(data)
+        # 집과 지역 전체
+        else:
+            new_data_list.append(data)
+
+    return new_data_list
+
+def _parsing_data(data):
+    result = {
+        "title": data["HOUSE_NM"],
+        "jiyeok": data["SUBSCRPT_AREA_CODE_NM"],
+        "date": data["IN_DATE"],
+        "house_manage_code": data["HOUSE_MANAGE_NO"],
+        "house_pblanc_code": data["PBLANC_NO"],
+        "house_secd": data["HOUSE_SECD"]
+    }
+    
+    return result
+
+async def _post_handler(data, info_url):
+    extract_data = _parsing_data(data)
+    # 파일 이름
+    file_name = f'{extract_data["title"]}_{extract_data["jiyeok"]}_{extract_data["date"]}.pdf'
+    
+    # 세부내용 url로 데이터 post
+    detail_params = {
+        "houseManageNo": extract_data["house_manage_code"],
+        "pblancNo": extract_data["house_pblanc_code"],
+        "houseSecd": extract_data["house_secd"],
+        "gvPgmId": "AIB01M01"
+    }
+    detail_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+    }
+    
+    if extract_data["house_secd"] == "01" or extract_data["house_secd"] == "09":
+        detail_url = info_url[0]
+    elif extract_data["house_secd"] == "04" or extract_data["house_secd"] == "06" or extract_data["house_secd"] == "11":
+        detail_url = info_url[1]
+    else:
+        detail_url = info_url[2]
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(detail_url, data=detail_params, headers=detail_headers)
+            response.raise_for_status()
+            html_content = response.text
+            md_content = markdownify.markdownify(html_content)
+            
+            soup = BeautifulSoup(html_content, 'html.parser')
+            link_tag = soup.find("a", class_="radius_btn")
+            down_link = link_tag.get("href") if link_tag else None
+            
+            return {
+                "data_hmno": extract_data,
+                "md_content": md_content,
+                "pdf_url": down_link
+            }
+
+    except Exception as e:
+        return f"예상치 못한 오류 발생: {e}"
+
 @mcp.tool(
   name="get_result",
   description="대한민국의 아파트의 청약, 민간사전청약아파트, 민간임대오피스텔 등의 정보를 수집할 수 있는 tool입니다."
@@ -175,12 +260,12 @@ async def get_result(
 
     house_type_list = []
     jiyeok_list = []
-
+    
     if jiyeok in enum_jiyeok:
         jiyeok_list = [jiyeok]
     else:
         jiyeok = await _transform_address(jiyeok=jiyeok)        
-
+    
     if house_type != "전체":
         h_type_key = type_keys[house_type]
         house_type_list.extend(h_type_key)
@@ -189,7 +274,15 @@ async def get_result(
             jiyeok_key = jiyeok_keys[sido]
             jiyeok_list.extend(jiyeok_key)
 
-    return jiyeok
+    data_list = _filtering(house_type=house_type_list,
+                                jiyeok=jiyeok_list,
+                                data_list=data_list)
+
+    posts = await asyncio.gather(
+        *[_post_handler(data, info_url) for data in data_list]
+    )
+
+    return posts
 
 if __name__ == "__main__":
     print("MCP Server Start")
