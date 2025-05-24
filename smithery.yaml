@@ -1,0 +1,14 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required: []
+    properties: {}
+    description: No configuration required.
+  commandFunction: 
+    |-
+    (config) => ({
+      command: "python3",
+      args: ["crawler.py"],
+      env: {},
+    })
