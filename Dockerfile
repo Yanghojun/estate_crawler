@@ -12,7 +12,7 @@ RUN python -c "import tomllib; deps = tomllib.load(open('pyproject.toml', 'rb'))
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY crawler.py .
-COPY .env .
+# COPY .env .
 
 # Command
 CMD ["python3", "crawler.py"]

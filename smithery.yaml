@@ -2,13 +2,20 @@ startCommand:
   type: stdio
   configSchema:
     type: object
-    required: []
-    properties: {}
-    description: No configuration required.
+    required: 
+      - apiSecretKey
+    properties: 
+      apiSecretKey:
+        type: string
+        description: "API Secret Key for estate crawler"
   commandFunction: 
     |-
     (config) => ({
       command: "python3",
       args: ["crawler.py"],
-      env: {},
+      env: {
+        X_NCP_APIGW_API_KEY_ID: "kjy1q312yn",
+        X_NCP_APIGW_API_KEY: "lkW2kptI30E3nIZQTuvw7JOfywaTFw6kjrqsAb4E",
+        JUSO_API_KEY=config.apiSecretKey
+        },
     })
