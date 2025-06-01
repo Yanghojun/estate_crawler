@@ -282,6 +282,7 @@ async def get_result(
         *[_post_handler(data, info_url) for data in data_list]
     )
 
+    print(posts)
     return posts
 
 if __name__ == "__main__":
