@@ -282,9 +282,12 @@ async def get_result(
         *[_post_handler(data, info_url) for data in data_list]
     )
 
-    print(posts)
     return posts
 
 if __name__ == "__main__":
     print("MCP Server Start")
     mcp.run("stdio")
+
+# if __name__ == "__main__":
+#     import asyncio
+#     asyncio.run(get_result("아파트", "강남시"))
