@@ -16,6 +16,6 @@ startCommand:
       env: {
         X_NCP_APIGW_API_KEY_ID: "kjy1q312yn",
         X_NCP_APIGW_API_KEY: "lkW2kptI30E3nIZQTuvw7JOfywaTFw6kjrqsAb4E",
-        JUSO_API_KEY=config.apiSecretKey
+        JUSO_API_KEY: config.apiSecretKey
         },
     })
